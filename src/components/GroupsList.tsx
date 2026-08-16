@@ -3,6 +3,35 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Users,
+  Plus,
+  DoorOpen,
+  Coins,
+  Wallet,
+  TrendingUp,
+} from "lucide-react";
+import { CURRENCIES } from "../../convex/utils";
+import { formatCurrency } from "@/lib/format";
 
 interface GroupsListProps {
   onSelectGroup: (groupId: Id<"groups">) => void;
@@ -13,52 +42,55 @@ export function GroupsList({ onSelectGroup }: GroupsListProps) {
   const createGroup = useMutation(api.groups.createGroup);
   const joinGroup = useMutation(api.groups.joinGroup);
 
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [showJoinForm, setShowJoinForm] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [joinOpen, setJoinOpen] = useState(false);
   const [groupName, setGroupName] = useState("");
+  const [currency, setCurrency] = useState("USD");
   const [inviteCode, setInviteCode] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleCreateGroup = async (e: React.FormEvent) => {
+  const handleCreateGroup = (e: React.FormEvent) => {
     e.preventDefault();
     if (!groupName.trim()) return;
-
-    setLoading(true);
-    try {
-      const groupId = await createGroup({ name: groupName.trim() });
-      setGroupName("");
-      setShowCreateForm(false);
-      toast.success("Group created successfully!");
-      onSelectGroup(groupId);
-    } catch (error) {
-      toast.error("Failed to create group");
-    } finally {
-      setLoading(false);
-    }
+    void (async () => {
+      setLoading(true);
+      try {
+        const groupId = await createGroup({ name: groupName.trim(), currency });
+        setGroupName("");
+        setCreateOpen(false);
+        toast.success("Group created successfully!");
+        onSelectGroup(groupId);
+      } catch (error: any) {
+        toast.error("Failed to create group", { description: error?.message });
+      } finally {
+        setLoading(false);
+      }
+    })();
   };
 
-  const handleJoinGroup = async (e: React.FormEvent) => {
+  const handleJoinGroup = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inviteCode.trim()) return;
-
-    setLoading(true);
-    try {
-      const groupId = await joinGroup({ inviteCode: inviteCode.trim().toUpperCase() });
-      setInviteCode("");
-      setShowJoinForm(false);
-      toast.success("Joined group successfully!");
-      onSelectGroup(groupId);
-    } catch (error) {
-      toast.error("Failed to join group. Check the invite code.");
-    } finally {
-      setLoading(false);
-    }
+    void (async () => {
+      setLoading(true);
+      try {
+        const groupId = await joinGroup({ inviteCode: inviteCode.trim() });
+        setInviteCode("");
+        setJoinOpen(false);
+        toast.success("You joined the group!");
+        onSelectGroup(groupId);
+      } catch (error: any) {
+        toast.error("Failed to join group", { description: error?.message });
+      } finally {
+        setLoading(false);
+      }
+    })();
   };
 
   if (groups === undefined) {
     return (
       <div className="flex justify-center items-center min-h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -66,124 +98,170 @@ export function GroupsList({ onSelectGroup }: GroupsListProps) {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-3xl font-bold text-gray-900">Your Groups</h1>
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Your Groups</h1>
+          <p className="text-gray-500 mt-1">
+            Manage your shared expenses, track balances, and settle up.
+          </p>
+        </div>
         <div className="flex gap-2">
-          <button
-            onClick={() => setShowCreateForm(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4" />
             Create Group
-          </button>
-          <button
-            onClick={() => setShowJoinForm(true)}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-          >
+          </Button>
+          <Button variant="outline" onClick={() => setJoinOpen(true)}>
+            <DoorOpen className="h-4 w-4" />
             Join Group
-          </button>
+          </Button>
         </div>
       </div>
 
-      {/* Create Group Form */}
-      {showCreateForm && (
-        <div className="bg-white p-6 rounded-lg shadow-md border">
-          <h2 className="text-xl font-semibold mb-4">Create New Group</h2>
+      {/* Create Group Dialog */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create a new group</DialogTitle>
+            <DialogDescription>
+              Create a group to start tracking shared expenses with your friends,
+              roommates, or travel companions.
+            </DialogDescription>
+          </DialogHeader>
           <form onSubmit={handleCreateGroup} className="space-y-4">
-            <div>
-              <label htmlFor="groupName" className="block text-sm font-medium text-gray-700 mb-1">
-                Group Name
-              </label>
-              <input
+            <div className="space-y-2">
+              <Label htmlFor="groupName">Group name</Label>
+              <Input
                 id="groupName"
                 type="text"
                 value={groupName}
                 onChange={(e) => setGroupName(e.target.value)}
-                placeholder="Enter group name"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="e.g. Summer Trip, Apartment 4B"
                 required
+                maxLength={50}
               />
             </div>
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={loading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-              >
-                {loading ? "Creating..." : "Create"}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowCreateForm(false);
-                  setGroupName("");
-                }}
-                className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors"
-              >
-                Cancel
-              </button>
+            <div className="space-y-2">
+              <Label htmlFor="currency">Currency</Label>
+              <Select value={currency} onValueChange={setCurrency}>
+                <SelectTrigger id="currency">
+                  <SelectValue placeholder="Select currency" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CURRENCIES.map((c) => (
+                    <SelectItem key={c.code} value={c.code}>
+                      {c.label} ({c.symbol})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={loading}>
+                {loading ? "Creating..." : "Create group"}
+              </Button>
+            </DialogFooter>
           </form>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
-      {/* Join Group Form */}
-      {showJoinForm && (
-        <div className="bg-white p-6 rounded-lg shadow-md border">
-          <h2 className="text-xl font-semibold mb-4">Join Group</h2>
+      {/* Join Group Dialog */}
+      <Dialog open={joinOpen} onOpenChange={setJoinOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Join a group</DialogTitle>
+            <DialogDescription>
+              Enter the invite code shared with you by a group member.
+            </DialogDescription>
+          </DialogHeader>
           <form onSubmit={handleJoinGroup} className="space-y-4">
-            <div>
-              <label htmlFor="inviteCode" className="block text-sm font-medium text-gray-700 mb-1">
-                Invite Code
-              </label>
-              <input
+            <div className="space-y-2">
+              <Label htmlFor="inviteCode">Invite code</Label>
+              <Input
                 id="inviteCode"
                 type="text"
                 value={inviteCode}
                 onChange={(e) => setInviteCode(e.target.value)}
-                placeholder="Enter invite code"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="e.g. A3F9K2"
                 required
+                maxLength={20}
+                className="uppercase"
               />
             </div>
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={loading}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
-              >
-                {loading ? "Joining..." : "Join"}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowJoinForm(false);
-                  setInviteCode("");
-                }}
-                className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors"
-              >
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setJoinOpen(false)}>
                 Cancel
-              </button>
-            </div>
+              </Button>
+              <Button type="submit" disabled={loading}>
+                {loading ? "Joining..." : "Join group"}
+              </Button>
+            </DialogFooter>
           </form>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
-      {/* Groups List */}
+      {/* Groups Grid */}
       {groups.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-gray-500 text-lg">No groups yet. Create or join a group to get started!</p>
-        </div>
+        <Card>
+          <CardContent className="text-center py-16">
+            <Wallet className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-800 mb-2">No groups yet</h3>
+            <p className="text-gray-500 max-w-sm mx-auto mb-6">
+              Create a group to start splitting expenses, or join an existing one
+              with an invite code.
+            </p>
+            <div className="flex justify-center gap-2">
+              <Button onClick={() => setCreateOpen(true)}>
+                <Plus className="h-4 w-4" />
+                Create Group
+              </Button>
+              <Button variant="outline" onClick={() => setJoinOpen(true)}>
+                <DoorOpen className="h-4 w-4" />
+                Join Group
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {groups.filter((group): group is NonNullable<typeof group> => group !== null).map((group) => (
-            <div
-              key={group._id}
-              onClick={() => onSelectGroup(group._id)}
-              className="bg-white p-6 rounded-lg shadow-md border hover:shadow-lg transition-shadow cursor-pointer"
-            >
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">{group.name}</h3>
-              <p className="text-sm text-gray-500">Invite Code: {group.inviteCode}</p>
-            </div>
-          ))}
+          {groups
+            .filter(Boolean)
+            .map(({ group, memberCount, totalSpent }: any) => (
+              <Card
+                key={group._id}
+                onClick={() => onSelectGroup(group._id)}
+                className="cursor-pointer hover:shadow-md hover:border-primary/40 transition-all"
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <CardTitle className="text-lg">{group.name}</CardTitle>
+                    <span className="inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-100 rounded-full px-2 py-1">
+                      {group.currency}
+                    </span>
+                  </div>
+                  <CardDescription className="flex items-center gap-1">
+                    <Users className="h-3.5 w-3.5" />
+                    {memberCount} {memberCount === 1 ? "member" : "members"}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-end justify-between border-t pt-3">
+                    <div className="flex items-center gap-2">
+                      <Coins className="h-4 w-4 text-gray-400" />
+                      <span className="text-sm text-gray-600">Total spent</span>
+                    </div>
+                    <span className="text-lg font-semibold flex items-center gap-1">
+                      <TrendingUp className="h-4 w-4 text-primary" />
+                      {formatCurrency(totalSpent, group.currency)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2">
+                    Invite code: <span className="font-mono font-medium">{group.inviteCode}</span>
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
         </div>
       )}
     </div>
